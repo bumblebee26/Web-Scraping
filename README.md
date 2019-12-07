@@ -1,2 +1,6 @@
 # Web Scraping
- Various web scraper used by me in my projects. 
+
+## Python Libraries used - 
+1. BeautifulSoup
+2. Requests
+3. Selenium
