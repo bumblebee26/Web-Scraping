@@ -4,15 +4,18 @@ Created on Sat Dec  7 22:02:45 2019
 
 @author: viren
 """
-
+import time
+import datetime
 import pandas as pd
 import numpy as np
 import requests
 from bs4 import BeautifulSoup
-import os
 import re
-import shutil
 
+# For timing
+s = time.time()
+print("\n\n\t\t\t\t****Webscrapying Begins****\n")
+# Getting the content from given link
 r = requests.get("https://height-weight-chart.com")
 c = r.content #raw text
 soup = BeautifulSoup(c,"html.parser")  #html format text
@@ -51,22 +54,98 @@ for i in range(0, a):
 title = title.split(",")
 file = file.split(",")
 f = [x.replace('s/', '') for x in file]
-file = f
+a = [x.replace('_s', '') for x in f]
+file = a
 ht_wt = ht_wt.split(",")
 
 path = "https://height-weight-chart.com/"
 link = []
 link = [path.strip() + x.strip() for x in title]
 
-# Downloading the images 
-print("\n\n****Downloading begins****\n\n")
 
-response = requests.get(path)
-soup = BeautifulSoup(response.text, 'html.parser')
-img_tags = soup.find_all("img",{"class":"thumb"})
-urls = [img['src'] for img in img_tags]
+# Downloading the images from the homepage
 
-for url in urls:
+##This script downloads low quality images
+#print("\n\n****Downloading begins****\n\n")
+
+# response = requests.get(path)
+# soup = BeautifulSoup(response.text, 'html.parser')
+# img_tags = soup.find_all("img",{"class":"thumb"})
+# urls = [img['src'] for img in img_tags]
+
+# for url in urls:
+#     filename = re.search(r'/([\w_-]+[.](jpg))$', url)
+#     with open(filename.group(1), 'wb') as f:
+#         if 'http' not in url:
+#             # sometimes an image source can be relative 
+#             # if it is provide the base url which also happens 
+#             # to be the site variable atm. 
+#             url = '{}{}'.format(path, url)
+#         response = requests.get(url)
+#         f.write(response.content)
+
+# print("\n\n****All images are downloaded****\n\n")
+
+
+
+
+#Downloading the images from individual pages of the subject
+
+##This script downloads high quality images
+c = time.time()
+print("\nTime Elapsed: ",datetime.timedelta(seconds=c-s))
+print("\n\n\t\t****Collecting metadata for downloading images and .csv file****\n")
+
+k=0
+a = len(link)
+img_tags=[]
+htwt = []
+nt_img = []
+nt_htwt = []
+print("\n\t\t\t\t****This will take some time****")
+for i in range(1,a):
+    response = requests.get(link[i])
+    soup = BeautifulSoup(response.text, 'html.parser')
+    all_tags = soup.find_all("img")
+    tag = file[i]
+    flag = len(img_tags)
+    for j in range(len(all_tags)):
+        all = all_tags[j].get('src')
+        pattern = "l/" + tag[0:5].strip() ##selecting only first elements "height" as it is similar
+        result = str(pattern) in str(all)
+        if result == True:
+            img_tags.append(all)
+            htwt.append(ht_wt[i])
+            check = len(img_tags)
+            break;
+    if flag == check:                  ## Finding the links of the image tag, that are not appended
+        nt_img.append(link[i])
+        nt_htwt.append(ht_wt[i])
+    print("%s /" %i,(a-1))
+
+
+c = time.time()
+print("\nTime Elapsed: ",datetime.timedelta(seconds=c-s))
+print("\n\nNumber of images found:",len(img_tags))
+print("\nNumber of images remaining:",(a-1)-len(img_tags))
+print("\nImages not found: \n",nt_img)
+
+## Appending the remaining images to found images "tags"
+for i in range(len(nt_img)):
+    response = requests.get(nt_img[i])
+    soup = BeautifulSoup(response.text, 'html.parser')
+    tags = soup.find_all("img",{"class":"largepic"})
+    tag = tags[0]
+    nt_all = tag['src']
+    img_tags.append(nt_all)
+    htwt.append(nt_htwt[i])
+
+print("\n\nTotal images found:",len(img_tags))
+print("\n\t\t\t\t****All images are found****\n")    
+c = time.time()
+print("\nTime Elapsed: ",datetime.timedelta(seconds=c-s))
+print("\n\t\t\t\t****Downloading begins****\n\n\nDownloaded images are being stored in the same path as the 'scraper.py' file\n\n")
+for url in img_tags:
     filename = re.search(r'/([\w_-]+[.](jpg))$', url)
     with open(filename.group(1), 'wb') as f:
         if 'http' not in url:
@@ -76,15 +155,27 @@ for url in urls:
             url = '{}{}'.format(path, url)
         response = requests.get(url)
         f.write(response.content)
+        print(url)
 
-print("\n\n****All images are downloaded****\n\n")
+c = time.time()
+print("\n\n\t\t\t\t\t****All images are downloaded****\n\n")
+c = time.time()
+print("\nTime Elapsed: ",datetime.timedelta(seconds=c-s))
+
+
 
 # Creating DataFrame
+img_name = []
+for x in img_tags:
+    x = x.replace('l/','')
+    img_name.append(x)
+
 df = pd.DataFrame()
-df["Image_link"] = link
-df["Filename"] = file
-df["Height & Weight"] = ht_wt
-df = df.loc[1:]
+df["Image_link"] = link[1:]
+df["Filename"] = img_name
+df["Height & Weight"] = htwt
+df = pd.DataFrame(np.sort(df.values, axis=0), index=df.index, columns=df.columns)
 df.to_csv("Output_data.csv")
 
-print("\n\n****Output CSV file is created****\n\n")
+print("\t\t\t\t****Output CSV file is created****\n")
+print("Final execution Time: ",datetime.timedelta(seconds=c-s))
